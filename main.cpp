@@ -130,48 +130,46 @@ Image compute_disparity(const Image& left, const Image& right, int window_size, 
 }
 
 int main() {
+    int max_disparity = 64;
+    int window_size = 7;
     for (int sad = 0; sad <= 1; sad++) {
-        for (int window_size = 7; window_size <= 21; window_size += 2) {
-            for (int max_disparity = 64; max_disparity <= 256; max_disparity += 64) {
-                std::cout << "Working directory: " << std::filesystem::current_path() << "\n";
+        std::cout << "Working directory: " << std::filesystem::current_path() << "\n";
 
-                Image left_gray, right_gray;
-                int width1, height1, width2, height2;
+        Image left_gray, right_gray;
+        int width1, height1, width2, height2;
 
-                if (!load_image_as_grayscale("img\\left_1.png", left_gray, width1, height1)) {
-                    std::cerr << "Failed to load left_1.png\n";
-                    return 1;
-                }
-
-                if (!load_image_as_grayscale("img\\right_1.png", right_gray, width2, height2)) {
-                    std::cerr << "Failed to load right_1.png\n";
-                    return 1;
-                }
-
-                if (width1 != width2 || height1 != height2) {
-                    std::cerr << "Image sizes do not match.\n";
-                    return 1;
-                }
-
-                std::cout << "Computing disparity map with "
-                          << (sad ? "SAD" : "SSD") << ", window_size = " << window_size
-                          << ", max_disparity = " << max_disparity << "...\n";
-
-                Image disparity = compute_disparity(left_gray, right_gray, window_size, max_disparity, sad);
-
-                std::string filename = "disparity_" +
-                                       std::string(sad ? "sad" : "ssd") +
-                                       "_ws" + std::to_string(window_size) +
-                                       "_md" + std::to_string(max_disparity) + ".pgm";
-
-                if (!write_pgm(filename, disparity)) {
-                    std::cerr << "Failed to write " << filename << "\n";
-                    return 1;
-                }
-
-                std::cout << "Saved: " << filename << "\n";
-            }
+        if (!load_image_as_grayscale("img\\left_1.png", left_gray, width1, height1)) {
+            std::cerr << "Failed to load left_1.png\n";
+            return 1;
         }
+
+        if (!load_image_as_grayscale("img\\right_1.png", right_gray, width2, height2)) {
+            std::cerr << "Failed to load right_1.png\n";
+            return 1;
+        }
+
+        if (width1 != width2 || height1 != height2) {
+            std::cerr << "Image sizes do not match.\n";
+            return 1;
+        }
+
+        std::cout << "Computing disparity map with "
+                  << (sad ? "SAD" : "SSD") << ", window_size = " << window_size
+                  << ", max_disparity = " << max_disparity << "...\n";
+
+        Image disparity = compute_disparity(left_gray, right_gray, window_size, max_disparity, sad);
+
+        std::string filename = "disparity_" +
+                               std::string(sad ? "sad" : "ssd") +
+                               "_ws" + std::to_string(window_size) +
+                               "_md" + std::to_string(max_disparity) + ".pgm";
+
+        if (!write_pgm(filename, disparity)) {
+            std::cerr << "Failed to write " << filename << "\n";
+            return 1;
+        }
+
+        std::cout << "Saved: " << filename << "\n";
     }
 
     return 0;
