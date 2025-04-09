@@ -5,10 +5,10 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <cmath>
 #include <limits>
 #include <filesystem>
-//#include <bits/stdc++.h>
+#include <string>
+#include <omp.h>
 
 typedef std::vector<std::vector<int>> Image;
 
@@ -95,6 +95,7 @@ Image compute_disparity(const Image& left, const Image& right, int window_size, 
     Image disparity_map(height, std::vector<int>(width, 0));
 
     // Iterate over valid pixels. Skip borders.
+    #pragma omp parallel for default(none) shared(left, right, disparity_map, width, height, half_window, max_disparity, sad, window_size)
     for (int y = half_window; y < height - half_window; ++y) {
         for (int x = half_window; x < width - half_window; ++x) {
             int best_disparity = 0; // Stores the shift with the lowest SAD.
@@ -111,7 +112,7 @@ Image compute_disparity(const Image& left, const Image& right, int window_size, 
                     for (int dx = -half_window; dx <= half_window; ++dx) {
                         int left_pixel = left[y + dy][x + dx];
                         int right_pixel = right[y + dy][x + dx - d];
-                        sad_or_ssd += sad ? abs(left_pixel - right_pixel) : std::pow(left_pixel - right_pixel, 2);
+                        sad_or_ssd += sad ? abs(left_pixel - right_pixel) : (left_pixel-right_pixel) * (left_pixel-right_pixel);
                     }
                 }
 
@@ -129,7 +130,7 @@ Image compute_disparity(const Image& left, const Image& right, int window_size, 
     return disparity_map;
 }
 
-int main() {
+int example_usage() {
     int max_disparity = 64;
     int window_size = 7;
     for (int sad = 0; sad <= 1; sad++) {
@@ -171,6 +172,62 @@ int main() {
 
         std::cout << "Saved: " << filename << "\n";
     }
+
+    return 0;
+}
+
+void benchmark() {
+    int max_disparity = 64;
+    int window_size = 7;
+
+    std::chrono::duration<double> min_sec(5.0); // There is no slower algorithm, so it is equal to +inf
+    std::chrono::duration<double> max_sec(0.0); // There is no faster algorithm, so it is equal to -inf
+
+    std::vector<std::pair<std::string, std::string>> image_pairs = {
+            {"img\\left_1.png", "img\\right_1.png"},
+            {"img\\left_2.png", "img\\right_2.png"}
+    };
+
+
+    for (int sad = 0; sad <= 1; sad++) {
+        for (const auto& [left_path, right_path] : image_pairs) {
+            std::cout << "=== Benchmarking " << (sad ? "SSD" : "SAD") << " on " << left_path << " and " << right_path << " ===\n";
+            for (int i = 0; i <= 100; i++) {
+                Image left_gray, right_gray;
+                int width1, height1, width2, height2;
+
+                if (!load_image_as_grayscale(left_path, left_gray, width1, height1)) {
+                    std::cerr << "Failed to load " << left_path << "\n";
+                    continue;
+                }
+
+                if (!load_image_as_grayscale(right_path, right_gray, width2, height2)) {
+                    std::cerr << "Failed to load " << right_path << "\n";
+                    continue;
+                }
+
+                if (width1 != width2 || height1 != height2) {
+                    std::cerr << "Image sizes do not match.\n";
+                    continue;
+                }
+
+                auto start = std::chrono::high_resolution_clock::now();
+
+                Image disparity = compute_disparity(left_gray, right_gray, window_size, max_disparity, sad);
+
+                auto end = std::chrono::high_resolution_clock::now();
+                min_sec = (end - start < min_sec) ? end - start : min_sec;
+                max_sec = (end - start > max_sec) ? end - start : max_sec;
+            }
+        }
+        std::cout << "Min computation time with " << (sad ? "SAD" : "SSD") << ", window_size = " << window_size << ", max_disparity = " << max_disparity << ": " << min_sec.count() << " seconds\n";
+        std::cout << "Max computation time with " <<  ": " << max_sec.count() << " seconds\n\n";
+    }
+}
+
+int main() {
+    omp_set_num_threads(4);
+    benchmark();
 
     return 0;
 }
